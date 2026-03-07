@@ -19,17 +19,45 @@ class CalDAV {
 		}
 
 		public function getEvents( $calendarUrl ) {
-				$response = $this->client->propFind( $calendarUrl, [
-						'{DAV:}displayname',
-						'{urn:ietf:params:xml:ns:caldav}calendar-description',
-						'{urn:ietf:params:xml:ns:caldav}calendar-data',
-				], 2 );
+				\Log::info('CalDAV getEvents called with URL', ['url' => $calendarUrl]);
+
+				$xmlBody = '<?xml version="1.0" encoding="UTF-8"?>' . "\n" .
+				           '<C:calendar-query xmlns:C="urn:ietf:params:xml:ns:caldav" xmlns:D="DAV:">' . "\n" .
+				           '  <D:prop>' . "\n" .
+				           '    <D:getetag/>' . "\n" .
+				           '    <C:calendar-data/>' . "\n" .
+				           '  </D:prop>' . "\n" .
+				           '  <C:filter>' . "\n" .
+				           '    <C:comp-filter name="VCALENDAR">' . "\n" .
+				           '      <C:comp-filter name="VEVENT">' . "\n" .
+				           '      </C:comp-filter>' . "\n" .
+				           '    </C:comp-filter>' . "\n" .
+				           '  </C:filter>' . "\n" .
+				           '</C:calendar-query>';
+
+				$response = $this->client->request( 'REPORT', $calendarUrl, $xmlBody, [
+						'Content-Type' => 'application/xml; charset=utf-8',
+						'Depth' => '1',
+				] );
+
+				\Log::info('CalDAV REPORT response', ['status' => $response['statusCode'] ?? 'no status', 'body_length' => strlen($response['body'] ?? '')]);
 
 				$events = [];
-				foreach ( $response as $eventData ) {
-						if ( isset( $eventData['{urn:ietf:params:xml:ns:caldav}calendar-data'] ) ) {
-								$events[] = $eventData['{urn:ietf:params:xml:ns:caldav}calendar-data'];
+				if ( isset( $response['statusCode'] ) && $response['statusCode'] >= 200 && $response['statusCode'] < 300 ) {
+						if ( isset( $response['body'] ) && ! empty( $response['body'] ) ) {
+								\Log::info('CalDAV response body preview', ['body' => substr($response['body'], 0, 500)]);
+								// Parse the XML response to extract calendar-data
+								$matches = [];
+								preg_match_all( '/<(?:C:)?calendar-data[^>]*>(.*?)<\/(?:C:)?calendar-data>/s', $response['body'], $matches );
+								if ( isset( $matches[1] ) ) {
+										foreach ( $matches[1] as $data ) {
+												$events[] = html_entity_decode( $data, ENT_XML1, 'UTF-8' );
+										}
+								}
+								\Log::info('CalDAV parsed events count', ['count' => count($events)]);
 						}
+				} else {
+						\Log::error('CalDAV REPORT failed', ['status' => $response['statusCode'] ?? 'unknown', 'body' => $response['body'] ?? 'no body']);
 				}
 
 				return $events;
