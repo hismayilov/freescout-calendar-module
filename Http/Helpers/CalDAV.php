@@ -235,14 +235,14 @@ class CalDAV {
 
 				libxml_use_internal_errors( true );
 				$document = new \DOMDocument();
-				if ( $document->loadXML( $responseBody ) ) {
+				if ( $document->loadXML( $responseBody, LIBXML_NONET ) ) {
 						$xpath = new \DOMXPath( $document );
 						$nodes = $xpath->query( '//*[local-name()="calendar-data"]' );
 						if ( $nodes !== false ) {
 								foreach ( $nodes as $node ) {
 										$data = trim( $node->nodeValue );
 										if ( $data !== '' ) {
-												$events[] = html_entity_decode( $data, ENT_XML1, 'UTF-8' );
+												$events[] = $data;
 										}
 								}
 						}
@@ -279,7 +279,7 @@ class CalDAV {
 
 				libxml_use_internal_errors( true );
 				$document = new \DOMDocument();
-				if ( $document->loadXML( $responseBody ) ) {
+				if ( $document->loadXML( $responseBody, LIBXML_NONET ) ) {
 						$xpath = new \DOMXPath( $document );
 						$nodes = $xpath->query( '//*[local-name()="href"]' );
 						if ( $nodes !== false ) {
